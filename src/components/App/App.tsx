@@ -9,49 +9,34 @@ import ErrorMessage from "../ErrorMessage/ErrorMessage";
 
 import { toast, Toaster } from "react-hot-toast";
 import ReactPaginate from "react-paginate";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 
 import { useState, useEffect } from "react";
 import type { Movie } from "../../types/movie";
 
 export default function App() {
-  const [movies, setMovies] = useState<Movie[]>([]);
   const [query, setQuery] = useState<string>(""); 
   const [page, setPage] = useState<number>(1); 
-  const [totalPages, setTotalPages] = useState<number>(0); 
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [isError, setIsErrror] = useState(false);
   const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
-
-
-  const loadMovies = async (searchQuery: string, searchPage: number) => {
-    if (!searchQuery) return;
-
-    try {
-      setIsLoading(true);
-      setIsErrror(false);
-      const data = await fetchMovies(searchQuery, searchPage);
-
-      if (data.results.length === 0) {
-        toast("No movies found.");
-        setMovies([]);
-        setTotalPages(0);
-        return;
-      }
-
-      setMovies(data.results);
-      setTotalPages(data.total_pages);
-    } catch {
-      setIsErrror(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-
+  const {
+    data,
+    isLoading,
+    isError, } = useQuery({
+      queryKey: ["movies", query, page],
+      queryFn: () => fetchMovies(query, page),
+      enabled: query.trim() !== "",
+      placeholderData:keepPreviousData,
+    })
+  
+  const movies = data?.results ?? []
+  const totalPages = data?.total_pages ?? 0
+ 
   useEffect(() => {
-    loadMovies(query, page);
-  }, [query, page]);
+    if (query && data && movies.length === 0 && !isLoading) {
+      toast("No movie found.", {icon:"ℹ️"})
+    }
+  }, [data, movies.length, query, isLoading])
+
 
   const handleSearch = (newQuery: string) => {
     if (newQuery === query) return;
@@ -65,7 +50,7 @@ export default function App() {
       <SearchBar onSubmit={handleSearch} />
 
       {/*  Пагинация*/}
-      {movies.length > 0 && totalPages > 1 && (
+      {totalPages > 1 && (
         <ReactPaginate
           pageCount={totalPages}
           pageRangeDisplayed={5}
